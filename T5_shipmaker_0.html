@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<!-- Traveller 5 Shipmaker (from X-Boat No 1 page 15-19) client-side javascript in single html file -->
+<!-- The Traveller game in all forms is owned by Far Future Enterprises. Copyright 1977 – 2020 Far Future Enterprises. Traveller is a registered trademark of Far Future Enterprises. Far Future permits web sites and fanzines for this game, provided it contains this notice, that Far Future is notified, and subject to a withdrawal of permission on 90 days notice. The contents of this site are for personal, non-commercial use only. Any use of Far Future Enterprises’s copyrighted material or trademarks anywhere on this web site and its files should not be viewed as a challenge to those copyrights or trademarks. In addition, any program/articles/file on this site cannot be republished or distributed without the consent of the author who contributed it. -->
+<html>
+	<head>
+        <script type="text/javascript">
+            // global variables
+            const DEBUG_LEVELS = {silent:0,quiet:1,normal:2,verbose:3,debug:4,everything:5};
+    		const DEBUG = DEBUG_LEVELS.everything;
+
+            // Engineering tables, pages 16-17
+            // indices
+            const J0 = 0;
+            const J1 = 1;
+            const J2 = 2;
+            const J3 = 3;
+            const J4 = 4;
+            const J5 = 5;
+
+            const M0 = 0;
+            const M1 = 1;
+            const M2 = 2;
+            const M3 = 3;
+            const M4 = 4;
+            const M5 = 5;
+            const M6 = 6;
+
+            // strings
+            const JUMP = [ "No Jump Drive", "Jump-1", "Jump-2", "Jump-3", "Jump-4", "Jump-5"];
+            const MANEUVER = [  "Maneuver-0", "Maneuver-1", "Maneuver-2", "Maneuver-3", "Maneuver-4", "Maneuver-5", "Maneuver-6"];
+
+            // values
+            const oEngineeringTables = [
+                [
+                    {crew:1,tons_free:995,cost:1},
+                    {crew:2,tons_free:946,cost:56},
+                    {crew:3,tons_free:897,cost:111},
+                    {crew:4,tons_free:848,cost:166},
+                    {crew:6,tons_free:795,cost:221},
+                    {crew:7,tons_free:746,cost:276},
+                    {crew:8,tons_free:697,cost:331}
+                ],
+                [
+                    {crew:5,tons_free:824,cost:46},
+                    {crew:5,tons_free:804,cost:86},
+                    {crew:7,tons_free:751,cost:141},
+                    {crew:8,tons_free:702,cost:196},
+                    {crew:9,tons_free:653,cost:251},
+                    {crew:11,tons_free:599,cost:308},
+                    {crew:12,tons_free:550,cost:363}
+                ],
+                [
+                    {crew:9,tons_free:658,cost:86},
+                    {crew:10,tons_free:634,cost:127},
+                    {crew:10,tons_free:614,cost:167},
+                    {crew:12,tons_free:560,cost:223},
+                    {crew:13,tons_free:511,cost:278},
+                    {crew:14,tons_free:462,cost:333},
+                    {crew:16,tons_free:409,cost:388}
+                ],
+                [
+                    {crew:14,tons_free:487,cost:128},
+                    {crew:14,tons_free:467,cost:168},
+                    {crew:15,tons_free:443,cost:208},
+                    {crew:15,tons_free:423,cost:248},
+                    {crew:17,tons_free:370,cost:303},
+                    {crew:18,tons_free:321,cost:358},
+                    {crew:19,tons_free:272,cost:413}
+                ],
+                [
+                    {crew:18,tons_free:321,cost:168},
+                    {crew:18,tons_free:301,cost:208},
+                    {crew:19,tons_free:277,cost:248},
+                    {crew:20,tons_free:253,cost:289},
+                    {crew:20,tons_free:233,cost:329},
+                    {crew:21,tons_free:184,cost:384},
+                    {crew:23,tons_free:131,cost:439}
+                ],
+                [
+                    {crew:22,tons_free:155,cost:209},
+                    {crew:23,tons_free:131,cost:249},
+                    {crew:23,tons_free:111,cost:289},
+                    {crew:24,tons_free:87,cost:329},
+                    {crew:24,tons_free:67,cost:369},
+                    {crew:25,tons_free:43,cost:409}
+                ]
+            ];
+
+            // Cargo and Passenger Table page 18
+            // indices
+            const ALL_CARGO = 0;
+            const EIGHTY_TWENTY = 1;
+            const FIFTY_FIFTY = 2;
+            const TWENTY_EIGHTY = 3;
+            const ALL_PASSENGERS = 4;
+
+            // strings
+            const RATIOS = ["All Cargo", "80 / 20", "50 / 50", "20 / 80", "All Passengers" ];
+
+            // values
+            const oCargoPassengerTable = [
+                {cargo:1.0,passengers:0.0},
+                {cargo:0.8,passengers:0.05},
+                {cargo:0.5,passengers:0.125},
+                {cargo:0.2,passengers:0.2},
+                {cargo:0.0,passengers:0.25}
+            ];
+
+            // Passenger Accommodations Table page 18
+            // indices
+            const CROWDED = 0;
+            const STANDARD = 1;
+            const LUXURY = 2;
+
+            // strings
+            const ACCOMMODATIONS = ["Crowded (Demand-3)","Standard","Luxury (Demand+3)"];
+
+            // values
+            const oPassengerAccommodations = [
+                2.0,
+                1.0,
+                0.5
+            ]
+
+            // Emplacements
+            // indices
+            const NONE = 0;
+            const SINGLE = 1;
+            const DOUBLE = 2;
+            const TRIPLE = 3;
+
+            //strings
+            const EMPLACEMENTS = ["none","single","double","triple"];
+
+            // utility functions
+            function log(message, level) {
+                if (DEBUG >= level) {
+                    console.log( message );
+                }
+            }
+
+            // functions
+            function fnMakeShip( tonnage=1000, 
+                               streamlined=true, 
+                               jump=1, 
+                               maneuver=1, 
+                               bridge=true, 
+                               emplacements=EMPLACEMENTS.triple, 
+                               cargoRatio = FIFTY_FIFTY,
+                               accommodations = STANDARD ){
+
+                log ("[+] fnMakeShip")
+                log("[<] tonnage : " + tonnage, DEBUG_LEVELS.everything);
+                log("[<] streamlined : " + streamlined, DEBUG_LEVELS.everything);
+                log("[<] jump : " + jump, DEBUG_LEVELS.everything);
+                log("[<] maneuver : " + maneuver, DEBUG_LEVELS.everything);
+                log("[<] bridge : " + bridge, DEBUG_LEVELS.everything);
+                log("[<] emplacements : " + emplacements, DEBUG_LEVELS.everything);
+                log("[<] cargoRatio : " + cargoRatio, DEBUG_LEVELS.everything);
+                log("[<] accommodations : " + accommodations, DEBUG_LEVELS.everything);
+
+                var ship = new Object();
+
+                ship.tonnage = tonnage;
+                ship.smallcraft = false;
+                if (ship.tonnage < 100){
+                    ship.smallcraft = true;
+                }
+                ship.maneuver = maneuver;
+                ship.jump = jump;
+                ship.emplacements = emplacements;
+
+                // 1. Start
+                ship.unscaledTonnage = 1000;
+                //ship.unscaledTonsFree = ship.unscaledTonnage;
+                ship.unscaledCost = 32; // MCr
+
+                // 2. Streamlining
+                if (streamlined === true){
+                    ship.unscaledCost = 62; // MCr
+                }
+
+                // 3. Engineering
+                ship.unscaledCost = ship.unscaledCost + oEngineeringTables[jump][maneuver].cost;
+                ship.unscaledCrew = oEngineeringTables[jump][maneuver].crew;
+                ship.unscaledTonsFree = oEngineeringTables[jump][maneuver].tons_free;
+
+                // 4. Bridge
+                if (bridge === true){
+                    ship.unscaledCost = ship.unscaledCost + 5;
+                    ship.unscaledTonsFree = ship.unscaledTonsFree - 50;
+                }
+
+                // 5. Emplacements
+                if (emplacements > NONE){
+                    if (ship.smallcraft === true) {
+                        ship.unscaledTonsFree = ship.unscaledTonsFree - 3;
+                        ship.unscaledCost = ship.unscaledCost + 3; // triple firmpoints
+                    } else {
+                        ship.unscaledTonsFree = ship.unscaledTonsFree - 10;
+                        if (emplacements === SINGLE){
+                            ship.unscaledCost = ship.unscaledCost + 2;
+                        } else if (emplacements === DOUBLE){
+                            ship.unscaledCost = ship.unscaledCost + 5;
+                        } else {
+                            ship.unscaledCost = ship.unscaledCost + 10;
+                        }
+                    }
+                }
+
+                // Traveller 5.10, core book 2, page 52-53
+                if (ship.tonnage < 36 ){
+                    // one firmpoint
+                    ship.firmpoints = 1;
+                } else if (ship.tonnage < 71){
+                    // two firmpoints
+                    ship.firmpoints = 2;
+                } else if (ship.tonnage < 100){
+                    // three firmpoints
+                    ship.firmpoints = 3;
+                } else {
+                    // one hardpoint per 100 tons
+                    ship.hardpoints = parseInt(ship.tonnage / 100);
+                }
+
+                // 6. Cargo and Passengers
+                ship.unscaledCargo = ship.unscaledTonsFree * oCargoPassengerTable[cargoRatio].cargo;
+                ship.unscaledPassengers = ship.unscaledTonsFree * oCargoPassengerTable[cargoRatio].passengers;
+                ship.unscaledCost = ship.unscaledCost + 0.1 * ship.unscaledPassengers;
+
+                // 7. Passenger Accommodations
+                ship.unscaledPassengers = ship.unscaledPassengers * oPassengerAccommodations[accommodations];
+
+                // 8. Volume Adjustment
+                if (ship.smallcraft === true){
+                    // Small craft adjustment    
+                    scaleFactor = (tonnage - 5) / ship.unscaledTonnage;
+                } else {
+                    scaleFactor = tonnage / ship.unscaledTonnage;
+                }
+
+                ship.crew = parseInt(ship.unscaledCrew * scaleFactor);
+                if (ship.crew < 1){
+                    ship.crew = 1
+                }
+
+                ship.bridge = 0;
+                if (bridge === true) {
+                    ship.bridge = 50 * scaleFactor;
+                }
+
+                ship.passengers = parseInt(ship.unscaledPassengers * scaleFactor);
+                ship.cargo = ship.unscaledCargo * scaleFactor;
+                ship.cost = ship.unscaledCost * scaleFactor;
+
+                return ship;
+            }
+
+            function fnEmplacementsToString(ship){
+                emplacementsString = "Emplacements : ";
+                if (ship.emplacements > NONE){
+                    if (ship.smallcraft === true){
+                        firmpointCount = ship.firmpoints.toFixed(0);
+                        if (firmpointCount < 2){
+                            emplacementsString = emplacementsString + firmpointCount + " firmpoint\n";
+                        } else {
+                            emplacementsString = emplacementsString + firmpointCount + " firmpoints\n";
+                        }
+                    } else {
+                        hardpointCount = ship.hardpoints.toFixed(0);
+                        if (firmpointCount < 2){
+                            emplacementsString = emplacementsString + hardpointCount + " " + EMPLACEMENTS[ship.emplacements] + " hardpoint\n";
+                        } else {
+                            emplacementsString = emplacementsString + hardpointCount + " " + EMPLACEMENTS[ship.emplacements] + " hardpoints\n";
+                        }
+                    }
+                } else {
+                    emplacementsString = emplacementsString + EMPLACEMENTS[ship.emplacements] + "\n";
+                }
+                return emplacementsString;
+            }
+
+            function fnShipToString(ship){
+                shipString = "Volume : " + ship.tonnage + " tons\n";
+                if (ship.maneuver > M0) {
+                    shipString = shipString + "Performance : " + MANEUVER[ship.maneuver] + "\n";
+                }
+                if (ship.jump > J0) {
+                    shipString = shipString + "Jump : " + JUMP[ship.jump] + "\n";
+                }
+                shipString = shipString + "Crew : " + ship.crew.toFixed(0) + "\n";
+                shipString = shipString + "Bridge : " + ship.bridge.toPrecision(3) + " tons\n";
+                shipString = shipString + fnEmplacementsToString(ship);
+                shipString = shipString + "Passengers : " + ship.passengers.toFixed(0) + "\n";
+                shipString = shipString + "Cargo hold : " + ship.cargo.toPrecision(3) + " tons\n";
+                shipString = shipString + "Cost : " + ship.cost.toPrecision(3) + " MCr\n";
+
+                log("[>] : \n" + shipString, DEBUG_LEVELS.everything);
+                return shipString;
+            }
+        </script>
+    </head>
+    <body>
+		<script type="text/javascript">
+			txt = document.createElement("textarea");
+//			txt.cols = 160;
+			txt.rows = 20;
+			txt.style.width="98%";
+			txt.readOnly = true;
+			ship =  fnMakeShip( 75, true, 0, 2, true, TRIPLE, FIFTY_FIFTY, CROWDED );
+			txt.value = fnShipToString(ship);
+			document.body.appendChild(txt);
+		</script>
+    </body>
+</html>
+<!-- The Traveller game in all forms is owned by Far Future Enterprises. Copyright 1977 – 2020 Far Future Enterprises. -->
