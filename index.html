@@ -1,12 +1,21 @@
 <!DOCTYPE html>
-<!-- Traveller 5 Shipmaker (from X-Boat No 1 page 15-19) client-side javascript in single html file -->
-<!-- The Traveller game in all forms is owned by Far Future Enterprises. Copyright 1977 – 2020 Far Future Enterprises. Traveller is a registered trademark of Far Future Enterprises. Far Future permits web sites and fanzines for this game, provided it contains this notice, that Far Future is notified, and subject to a withdrawal of permission on 90 days notice. The contents of this site are for personal, non-commercial use only. Any use of Far Future Enterprises’s copyrighted material or trademarks anywhere on this web site and its files should not be viewed as a challenge to those copyrights or trademarks. In addition, any program/articles/file on this site cannot be republished or distributed without the consent of the author who contributed it. -->
 <html>
+<!-- 
+    Traveller 5 Quick Shipmaker (from X-Boat No 1 (Robert Eaglestone) page 15-19) client-side javascript in single html file
+
+    The Traveller game in all forms is owned by Far Future Enterprises. Copyright 1977 – 2020 Far Future Enterprises. 
+    Traveller is a registered trademark of Far Future Enterprises. Far Future permits web sites and fanzines for this game, 
+    provided it contains this notice, that Far Future is notified, and subject to a withdrawal of permission on 90 days notice. 
+    The contents of this page are for personal, non-commercial use only. Any use of Far Future Enterprises’s copyrighted 
+    material or trademarks anywhere on this web page and its file should not be viewed as a challenge to those copyrights 
+    or trademarks. In addition, this program/file on this site cannot be republished or distributed without the consent 
+    of the author who contributed it.
+-->
 	<head>
         <script type="text/javascript">
             // global variables
             const DEBUG_LEVELS = {silent:0,quiet:1,normal:2,verbose:3,debug:4,everything:5};
-    		const DEBUG = DEBUG_LEVELS.everything;
+    		const DEBUG = DEBUG_LEVELS.normal;
 
             // Engineering tables, pages 16-17
             // indices
@@ -86,6 +95,9 @@
                 ]
             ];
 
+            // bridge value
+            BRIDGE_TONNAGE = 50;
+
             // Cargo and Passenger Table page 18
             // indices
             const ALL_CARGO = 0;
@@ -95,9 +107,12 @@
             const ALL_PASSENGERS = 4;
 
             // strings
-            const RATIOS = ["All Cargo", "80 / 20", "50 / 50", "20 / 80", "All Passengers" ];
+            const CARGO = ["All Cargo", "80 / 20", "50 / 50", "20 / 80", "All Passengers" ];
 
             // values
+            // where passengers is factor and cargo fraction (range 0 to 1)
+            // passengers = (1.0 - cargo) / 4
+            // all passengers (i.e. cargo = 0) has factor 0.25
             const oCargoPassengerTable = [
                 {cargo:1.0,passengers:0.0},
                 {cargo:0.8,passengers:0.05},
@@ -139,35 +154,209 @@
                 }
             }
 
+            function logObject(message, object, level){
+                if (DEBUG >= level) {
+                    console.log( message, object );
+                }
+            }
+
+            function fnEmplacementsToString(ship){
+                emplacementsString = "Emplacements : ";
+                if (ship.emplacements > NONE){
+                    if (ship.smallcraft === true){
+                        firmpointCount = ship.firmpoints.toFixed(0);
+                        if (firmpointCount < 2){
+                            emplacementsString = emplacementsString + firmpointCount + " firmpoint\n";
+                        } else {
+                            emplacementsString = emplacementsString + firmpointCount + " firmpoints\n";
+                        }
+                    } else {
+                        hardpointCount = ship.hardpoints.toFixed(0);
+                        if (hardpointCount < 2){
+                            emplacementsString = emplacementsString + hardpointCount + " " + EMPLACEMENTS[ship.emplacements] + " hardpoint\n";
+                        } else {
+                            emplacementsString = emplacementsString + hardpointCount + " " + EMPLACEMENTS[ship.emplacements] + " hardpoints\n";
+                        }
+                    }
+                } else {
+                    emplacementsString = emplacementsString + EMPLACEMENTS[ship.emplacements] + "\n";
+                }
+                return emplacementsString;
+            }
+
+            function fnShipToString(ship){
+                logObject("[+] fnShip",ship,DEBUG_LEVELS.debug);
+                shipString = "";
+                shipString = shipString + "Volume : " + ship.tonnage + " tons";
+                if (ship.streamlined === true){
+                    shipString = shipString + " streamlined\n"
+                } else {
+                    shipString = shipString + " unstreamlined\n"
+                }
+                if (ship.maneuver > M0) {
+                    shipString = shipString + "Performance : " + MANEUVER[ship.maneuver] + "\n";
+                }
+                if (ship.jump > J0) {
+                    shipString = shipString + "Jump : " + JUMP[ship.jump] + "\n";
+                }
+                shipString = shipString + "Crew : " + ship.crew.toFixed(0) + "\n";
+                if ( ship.bridge < 0.1 ) {
+                    shipString = shipString + "Bridge : none\n";
+                } else {
+                    shipString = shipString + "Bridge : " + ship.bridge.toFixed(2) + " tons\n";
+                }
+                shipString = shipString + fnEmplacementsToString(ship);
+                shipString = shipString + "Passengers : " + ship.passengers.toFixed(0) + "\n";
+                shipString = shipString + "Cargo hold : " + ship.cargo.toFixed(2) + " tons\n";
+                shipString = shipString + "Cost : " + ship.cost.toFixed(2) + " MCr";
+
+                if (ship.error.length > 0 ){
+                    shipString = shipString + "\n" + ship.error;
+                }
+
+                log("[>] : \n" + shipString, DEBUG_LEVELS.everything);
+                return shipString;
+            }
+
+            // user interface utility functions
+            function addOptions( toSelectId, fromArray ){
+                ele = document.getElementById(toSelectId);
+                for (arrayIndex in fromArray){
+                    opt = document.createElement("option");
+                    txt = document.createTextNode(fromArray[arrayIndex]);
+                    opt.appendChild(txt);
+                    opt.value = arrayIndex;
+                    ele.appendChild(opt);
+                }
+            }
+
+            // read any query string parameters
+            // https://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
+            let urlParams = {};
+            (window.onpopstate = function () {
+                let match,
+                    pl = /\+/g,  // Regex for replacing addition symbol with a space
+                    search = /([^&=]+)=?([^&]*)/g,
+                    decode = function (s) {
+                        return decodeURIComponent(s.replace(pl, " "));
+                    },
+                    query = window.location.search.substring(1);
+
+                while (match = search.exec(query)) {
+                    if (decode(match[1]) in urlParams) {
+                        if (!Array.isArray(urlParams[decode(match[1])])) {
+                            urlParams[decode(match[1])] = [urlParams[decode(match[1])]];
+                        }
+                        urlParams[decode(match[1])].push(decode(match[2]));
+                    } else {
+                        urlParams[decode(match[1])] = decode(match[2]);
+                    }
+                }
+            })();
+
+            function fnHandleQueryParameters() {
+                // handle url query parameters - if none set defaults
+                logObject( "[<] url query parameters :", urlParams, DEBUG_LEVELS.debug );
+                if (urlParams.tonnage) {
+                    document.getElementById("tonnage").value = urlParams.tonnage;
+                } else {
+                    document.getElementById("tonnage").value = 1000;
+                }
+
+                if (urlParams.streamlined === "on") {
+                    document.getElementById("streamlined").checked = true;
+                }
+
+                if (urlParams.jump) {
+                    document.getElementById("jump").value = urlParams.jump;
+                } else {
+                    document.getElementById("jump").value = 1;
+                }
+
+                if (urlParams.maneuver) {
+                    document.getElementById("maneuver").value = urlParams.maneuver;
+                } else {
+                    document.getElementById("maneuver").value = 1;
+                }
+
+                if (urlParams.bridge === "on") {
+                    document.getElementById("bridge").checked = true;
+                }
+
+                if (urlParams.emplacements) {
+                    document.getElementById("emplacements").options.selectedIndex = urlParams.emplacements;
+                } else {
+                    document.getElementById("emplacements").options.selectedIndex = TRIPLE;
+                }
+
+                if (urlParams.cargo) {
+                    document.getElementById("cargo").options.selectedIndex = urlParams.cargo;
+                } else {
+                    document.getElementById("cargo").options.selectedIndex = FIFTY_FIFTY;
+                }
+
+                if (urlParams.accommodations) {
+                    document.getElementById("accommodations").options.selectedIndex = urlParams.accommodations;
+                } else {
+                    document.getElementById("accommodations").options.selectedIndex = STANDARD;
+                }
+            }
+
             // functions
             function fnMakeShip( tonnage=1000, 
                                streamlined=true, 
                                jump=1, 
                                maneuver=1, 
                                bridge=true, 
-                               emplacements=EMPLACEMENTS.triple, 
+                               emplacements = TRIPLE, 
                                cargoRatio = FIFTY_FIFTY,
                                accommodations = STANDARD ){
 
-                log ("[+] fnMakeShip")
-                log("[<] tonnage : " + tonnage, DEBUG_LEVELS.everything);
-                log("[<] streamlined : " + streamlined, DEBUG_LEVELS.everything);
-                log("[<] jump : " + jump, DEBUG_LEVELS.everything);
-                log("[<] maneuver : " + maneuver, DEBUG_LEVELS.everything);
-                log("[<] bridge : " + bridge, DEBUG_LEVELS.everything);
-                log("[<] emplacements : " + emplacements, DEBUG_LEVELS.everything);
-                log("[<] cargoRatio : " + cargoRatio, DEBUG_LEVELS.everything);
-                log("[<] accommodations : " + accommodations, DEBUG_LEVELS.everything);
+                log ("[+] fnMakeShip", DEBUG_LEVELS.debug)
+                log("[<] tonnage : " + tonnage, DEBUG_LEVELS.debug);
+                log("[<] streamlined : " + streamlined, DEBUG_LEVELS.debug);
+                log("[<] jump : " + jump, DEBUG_LEVELS.debug);
+                log("[<] maneuver : " + maneuver, DEBUG_LEVELS.debug);
+                log("[<] bridge : " + bridge, DEBUG_LEVELS.debug);
+                log("[<] emplacements : " + emplacements, DEBUG_LEVELS.debug);
+                log("[<] cargoRatio : " + cargoRatio, DEBUG_LEVELS.debug);
+                log("[<] accommodations : " + accommodations, DEBUG_LEVELS.debug);
 
                 var ship = new Object();
+                ship.streamlined = streamlined;
+                ship.error = "";
+
+                // sanity check tonnage
+                if (tonnage < 10){
+                    msg = "[!] minimum tonnage 10 tons, forcing tonnage from " + parseInt(tonnage)  + " to 10";
+                    ship.error = ship.error + msg + "\n";
+                    log(msg, DEBUG_LEVELS.quiet)
+                    tonnage = 10;
+                }
+
+                if (tonnage > 2400){
+                    msg = "[!] maximum ACS tonnage 2400 tons, forcing tonnage from " + parseInt(tonnage)  + " to 2400";
+                    ship.error = ship.error + msg + "\n";
+                    log(msg, DEBUG_LEVELS.quiet)
+                    tonnage = 2400;
+                }
 
                 ship.tonnage = tonnage;
                 ship.smallcraft = false;
                 if (ship.tonnage < 100){
                     ship.smallcraft = true;
                 }
-                ship.maneuver = maneuver;
-                ship.jump = jump;
+
+                if (ship.smallcraft === true){
+                    if (jump != 0){
+                        // jump greater than 0 not allowed for small craft
+                        // force jump to zero
+                        msg = "[!] smallcraft (tonnage (" + parseInt(tonnage) + ") less than 100) must be Jump 0, forcing jump from " + parseInt(jump)  + " to 0";
+                        ship.error = ship.error + msg + "\n";
+                        log(msg, DEBUG_LEVELS.quiet)
+                        jump = 0;
+                    }
+                }
                 ship.emplacements = emplacements;
 
                 // 1. Start
@@ -176,31 +365,56 @@
                 ship.unscaledCost = 32; // MCr
 
                 // 2. Streamlining
-                if (streamlined === true){
+                if (ship.streamlined === true){
                     ship.unscaledCost = 62; // MCr
                 }
 
                 // 3. Engineering
+                // sanity check values
+                if (oEngineeringTables[jump] === undefined){
+                    msg = "[!] invalid jump value " + jump + " forcing to zero!";
+                    ship.error = ship.error + msg + "\n";
+                    log(msg, DEBUG_LEVELS.quiet);
+                    jump = 0;
+                }
+                ship.jump = jump;
+
+                if (oEngineeringTables[jump][maneuver] === undefined){
+                    msg = "[!] invalid maneuver value " + maneuver + " forcing to zero!";
+                    ship.error = ship.error + msg + "\n";
+                    log(msg, DEBUG_LEVELS.quiet);
+                    maneuver = 0;
+                }
+                ship.maneuver = maneuver;
+
                 ship.unscaledCost = ship.unscaledCost + oEngineeringTables[jump][maneuver].cost;
                 ship.unscaledCrew = oEngineeringTables[jump][maneuver].crew;
                 ship.unscaledTonsFree = oEngineeringTables[jump][maneuver].tons_free;
 
                 // 4. Bridge
                 if (bridge === true){
-                    ship.unscaledCost = ship.unscaledCost + 5;
-                    ship.unscaledTonsFree = ship.unscaledTonsFree - 50;
+                    // sanity check TonsFree
+                    if (ship.unscaledTonsFree < BRIDGE_TONNAGE){
+                        msg = "[!] insufficient remaining tonnage (unscaled " + ship.unscaledTonsFree + ") for bridge, removing bridge";
+                        ship.error = ship.error + msg + "\n";
+                        log(msg, DEBUG_LEVELS.quiet);
+                        bridge = false;
+                    } else {
+                        ship.unscaledCost = ship.unscaledCost + 5;
+                        ship.unscaledTonsFree = ship.unscaledTonsFree - BRIDGE_TONNAGE;
+                    }
                 }
 
                 // 5. Emplacements
-                if (emplacements > NONE){
+                if (ship.emplacements > NONE){
                     if (ship.smallcraft === true) {
                         ship.unscaledTonsFree = ship.unscaledTonsFree - 3;
                         ship.unscaledCost = ship.unscaledCost + 3; // triple firmpoints
                     } else {
                         ship.unscaledTonsFree = ship.unscaledTonsFree - 10;
-                        if (emplacements === SINGLE){
+                        if (ship.emplacements === SINGLE){
                             ship.unscaledCost = ship.unscaledCost + 2;
-                        } else if (emplacements === DOUBLE){
+                        } else if (ship.emplacements === DOUBLE){
                             ship.unscaledCost = ship.unscaledCost + 5;
                         } else {
                             ship.unscaledCost = ship.unscaledCost + 10;
@@ -246,71 +460,150 @@
 
                 ship.bridge = 0;
                 if (bridge === true) {
-                    ship.bridge = 50 * scaleFactor;
+                    ship.bridge = BRIDGE_TONNAGE * scaleFactor;
                 }
 
                 ship.passengers = parseInt(ship.unscaledPassengers * scaleFactor);
-                ship.cargo = ship.unscaledCargo * scaleFactor;
                 ship.cost = ship.unscaledCost * scaleFactor;
+                ship.cargo = ship.unscaledCargo * scaleFactor;
 
                 return ship;
             }
 
-            function fnEmplacementsToString(ship){
-                emplacementsString = "Emplacements : ";
-                if (ship.emplacements > NONE){
-                    if (ship.smallcraft === true){
-                        firmpointCount = ship.firmpoints.toFixed(0);
-                        if (firmpointCount < 2){
-                            emplacementsString = emplacementsString + firmpointCount + " firmpoint\n";
-                        } else {
-                            emplacementsString = emplacementsString + firmpointCount + " firmpoints\n";
-                        }
-                    } else {
-                        hardpointCount = ship.hardpoints.toFixed(0);
-                        if (firmpointCount < 2){
-                            emplacementsString = emplacementsString + hardpointCount + " " + EMPLACEMENTS[ship.emplacements] + " hardpoint\n";
-                        } else {
-                            emplacementsString = emplacementsString + hardpointCount + " " + EMPLACEMENTS[ship.emplacements] + " hardpoints\n";
-                        }
-                    }
-                } else {
-                    emplacementsString = emplacementsString + EMPLACEMENTS[ship.emplacements] + "\n";
-                }
-                return emplacementsString;
-            }
-
-            function fnShipToString(ship){
-                shipString = "Volume : " + ship.tonnage + " tons\n";
-                if (ship.maneuver > M0) {
-                    shipString = shipString + "Performance : " + MANEUVER[ship.maneuver] + "\n";
-                }
-                if (ship.jump > J0) {
-                    shipString = shipString + "Jump : " + JUMP[ship.jump] + "\n";
-                }
-                shipString = shipString + "Crew : " + ship.crew.toFixed(0) + "\n";
-                shipString = shipString + "Bridge : " + ship.bridge.toPrecision(3) + " tons\n";
-                shipString = shipString + fnEmplacementsToString(ship);
-                shipString = shipString + "Passengers : " + ship.passengers.toFixed(0) + "\n";
-                shipString = shipString + "Cargo hold : " + ship.cargo.toPrecision(3) + " tons\n";
-                shipString = shipString + "Cost : " + ship.cost.toPrecision(3) + " MCr\n";
-
-                log("[>] : \n" + shipString, DEBUG_LEVELS.everything);
-                return shipString;
-            }
         </script>
+        <style>
+            * {
+                box-sizing: border-box;
+                font-size: medium;
+            }
+
+            h1 {
+                text-align: center;
+                font-size: large;
+                font-weight: bold;
+            }
+
+            input[type=number], select, textarea {
+                width: 100%;
+                padding: 8px;
+                border: 1px solid black;
+                border-radius: 4px;
+                box-sizing: border-box;
+                resize: vertical;
+                background-color: white;
+            }
+
+            label {
+                width: 100%;
+                padding: 8px 8px 8px 0;
+                display: inline-block;
+                text-align: center;
+                font-size: medium;
+            }
+
+            input[type=submit] {
+                background-color: lightgreen;
+                color: black;
+                padding: 8px 20px;
+                border: 1px solid black;
+                border-radius: 4px;
+                cursor: pointer;
+                float: right;
+            }
+
+            input[type=submit]:hover {
+                background-color: lawngreen;
+            }
+
+            .container {
+                background-color: ghostwhite;
+                padding: 20px;
+            }
+
+            p {
+                text-align: justify;
+                font-size: smaller;
+            }
+
+            .col-right {
+                float: left;
+                width: 60%;
+                margin-top: 6px;
+            }
+
+            .col-left {
+                float: left;
+                width: 40%;
+                margin-top: 6px;
+            }
+
+            /* Clear floats after the columns */
+            .row:after {
+                content: "";
+                display: table;
+                clear: both;
+            }
+
+            /* Responsive layout - when the screen is less than 600px wide, make the two columns stack on top of each other instead of next to each other */
+            @media (max-width: 600px) {
+                .col-left, .col-right, input[type=submit], p, h1 {
+                    width: 100%;
+                    margin-top: 0;
+                }
+            }
+        </style>
     </head>
     <body>
-		<script type="text/javascript">
-			txt = document.createElement("textarea");
-//			txt.cols = 160;
-			txt.rows = 20;
-			txt.style.width="98%";
-			txt.readOnly = true;
-			ship =  fnMakeShip( 75, true, 0, 2, true, TRIPLE, FIFTY_FIFTY, CROWDED );
-			txt.value = fnShipToString(ship);
-			document.body.appendChild(txt);
+        <div class="container">
+            <form action="#" target="_self">
+                <h1>Quick Shipmaker</h1>
+                <div class="row"><div class="col-left"><label id="tonnage_label" name="tonnage_label">tonnage</label></div><div class="col-right"><input type="number" id="tonnage" name="tonnage"></div></div>
+                <div class="row"><div class="col-left"><label id="streamlined_label" name="streamlined_label">streamlined</label></div><div class="col-right"><input type="checkbox" id="streamlined" name="streamlined"></div></div>
+                <div class="row"><div class="col-left"><label id="jump_label" name="jump_label">jump</label></div><div class="col-right"><input type="number" id="jump" name="jump"></div></div>
+                <div class="row"><div class="col-left"><label id="maneuver_label" name="maneuver_label">maneuver</label></div><div class="col-right"><input type="number" id="maneuver" name="maneuver"></div></div>
+                <div class="row"><div class="col-left"><label id="bridge_label" name="bridge_label">bridge</label></div><div class="col-right"><input type="checkbox" id="bridge" name="bridge"></div></div>
+                <div class="row"><div class="col-left"><label id="emplacements_label" name="emplacements_label">emplacements</label></div><div class="col-right"><select id="emplacements" name="emplacements"></select></div></div>
+                <div class="row"><div class="col-left"><label id="cargo_label" name="cargo_label">cargo</label></div><div class="col-right"><select id="cargo" name="cargo"></select></div></div>
+                <div class="row"><div class="col-left"><label id="accommodations_label" name="accommodations_label">accommodations</label></div><div class="col-right"><select id="accommodations" name="accommodations"></select></div></div>
+                <div class="row"><div class="col-left"></div><div class="col-right"><input type="submit" id="submit" name="submit" value="submit"></div></div>
+                <div class="row">
+                    <div class="col-left">The Traveller game in all forms is owned by Far Future Enterprises. Copyright 1977 – 2020 Far Future Enterprises. 
+                        Traveller is a registered trademark of Far Future Enterprises. Far Future permits web sites and fanzines for this game, 
+                        provided it contains this notice, that Far Future is notified, and subject to a withdrawal of permission on 90 days notice. 
+                        The contents of this page are for personal, non-commercial use only. Any use of Far Future Enterprises’s copyrighted 
+                        material or trademarks anywhere on this web page and its file should not be viewed as a challenge to those copyrights 
+                        or trademarks. In addition, this program/file on this site cannot be republished or distributed without the consent 
+                        of the author who contributed it.</div>
+                        <div class="col-right"><textarea rows="11" id="output" name="output" readonly="true"></textarea></div>
+                </form>
+        </div>
+
+        <script type="text/javascript">
+            // prepare the input form
+            addOptions( "emplacements", EMPLACEMENTS );
+            addOptions( "cargo", CARGO );
+            addOptions( "accommodations", ACCOMMODATIONS );
+            fnHandleQueryParameters();
+
+            ship =  fnMakeShip( document.getElementById("tonnage").value, 
+                                document.getElementById("streamlined").checked,
+                                document.getElementById("jump").value, 
+                                document.getElementById("maneuver").value, 
+                                document.getElementById("bridge").checked,
+                                document.getElementById("emplacements").value, 
+                                document.getElementById("cargo").value, 
+                                document.getElementById("accommodations").value );
+
+            document.getElementById("output").value = fnShipToString(ship);
 		</script>
     </body>
-</html>
-<!-- The Traveller game in all forms is owned by Far Future Enterprises. Copyright 1977 – 2020 Far Future Enterprises. -->
+<!-- 
+    The Traveller game in all forms is owned by Far Future Enterprises. Copyright 1977 – 2020 Far Future Enterprises. 
+    Traveller is a registered trademark of Far Future Enterprises. Far Future permits web sites and fanzines for this game, 
+    provided it contains this notice, that Far Future is notified, and subject to a withdrawal of permission on 90 days notice. 
+    The contents of this page are for personal, non-commercial use only. Any use of Far Future Enterprises’s copyrighted 
+    material or trademarks anywhere on this web page and its file should not be viewed as a challenge to those copyrights 
+    or trademarks. In addition, this program/file on this site cannot be republished or distributed without the consent 
+    of the author who contributed it.
+ -->
+ </html>
