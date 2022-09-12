@@ -4,9 +4,10 @@
     # Traveller 5 Shipmaker client-side javascript in single html file  
     (algorithm from X-Boat No 1 page 15-19 by Robert Eaglestone)
     ## Reference
-    * [webapp](https://witty-flower-07b53b703.azurestaticapps.net/)
-    * [Xboat kickstarter](https://www.kickstarter.com/projects/762366408/xboat-zinequest)
-    * [Xboat drivethrurpg](https://www.drivethrurpg.com/product/273367/Xboat-No-1)
+    * [https://quickshipmaker.apricus.page/] (https://quickshipmaker.apricus.page/)
+    * [https://witty-flower-07b53b703.azurestaticapps.net/](https://witty-flower-07b53b703.azurestaticapps.net/)
+    * [Xboat on kickstarter](https://www.kickstarter.com/projects/762366408/xboat-zinequest)
+    * [Xboat 1 on drivethrurpg](https://www.drivethrurpg.com/product/273367/Xboat-No-1)
     The Traveller game in all forms is owned by Far Future Enterprises. Copyright 1977 – 2020 Far Future Enterprises. 
     Traveller is a registered trademark of Far Future Enterprises. Far Future permits web sites and fanzines for this game, 
     provided it contains this notice, that Far Future is notified, and subject to a withdrawal of permission on 90 days notice. 
@@ -473,7 +474,17 @@
 
                 return ship;
             }
-
+            function clickSubmit(){
+                ship =  fnMakeShip( document.getElementById("tonnage").value, 
+                                    document.getElementById("streamlined").checked,
+                                    document.getElementById("jump").value, 
+                                    document.getElementById("maneuver").value, 
+                                    document.getElementById("bridge").checked,
+                                    document.getElementById("emplacements").value, 
+                                    document.getElementById("cargo").value, 
+                                    document.getElementById("accommodations").value );
+                document.getElementById("output").value = fnShipToString(ship);
+            }
         </script>
         <style>
             * {
@@ -505,7 +516,7 @@
                 font-size: medium;
             }
 
-            input[type=submit] {
+            input[type=button] {
                 background-color: lightgreen;
                 color: black;
                 padding: 8px 20px;
@@ -515,7 +526,7 @@
                 float: right;
             }
 
-            input[type=submit]:hover {
+            input[type=button]:hover {
                 background-color: lawngreen;
             }
 
@@ -550,7 +561,7 @@
 
             /* Responsive layout - when the screen is less than 600px wide, make the two columns stack on top of each other instead of next to each other */
             @media (max-width: 600px) {
-                .col-left, .col-right, input[type=submit], p, h1 {
+                .col-left, .col-right, input[type=button], p, h1 {
                     width: 100%;
                     margin-top: 0;
                 }
@@ -575,7 +586,7 @@
                 <div class="row"><div class="col-left"><label id="emplacements_label" name="emplacements_label">emplacements</label></div><div class="col-right"><select id="emplacements" name="emplacements"></select></div></div>
                 <div class="row"><div class="col-left"><label id="cargo_label" name="cargo_label">cargo</label></div><div class="col-right"><select id="cargo" name="cargo"></select></div></div>
                 <div class="row"><div class="col-left"><label id="accommodations_label" name="accommodations_label">accommodations</label></div><div class="col-right"><select id="accommodations" name="accommodations"></select></div></div>
-                <div class="row"><div class="col-left"></div><div class="col-right"><input type="submit" id="submit" name="submit" value="submit"></div></div>
+                <div class="row"><div class="col-left"></div><div class="col-right"><input type="button" id="submit" name="submit" value="submit" onclick="clickSubmit()"></div></div>
                 <div class="row">
                     <div class="col-left">The Traveller game in all forms is owned by Far Future Enterprises. Copyright 1977 &ndash; 2020 Far Future Enterprises. 
                         Traveller is a registered trademark of Far Future Enterprises. Far Future permits web sites and fanzines for this game, 
@@ -584,8 +595,8 @@
                         material or trademarks anywhere on this web page and its file should not be viewed as a challenge to those copyrights 
                         or trademarks. In addition, this program/file on this site cannot be republished or distributed without the consent 
                         of the author who contributed it.</div>
-                        <div class="col-right"><textarea rows="11" id="output" name="output" readonly="true"></textarea></div>
-                </form>
+                <div class="col-right"><textarea rows="11" id="output" name="output" readonly="true"></textarea></div>
+            </form>
         </div>
 
         <script type="text/javascript">
@@ -594,17 +605,7 @@
             addOptions( "cargo", CARGO );
             addOptions( "accommodations", ACCOMMODATIONS );
             fnHandleQueryParameters();
-
-            ship =  fnMakeShip( document.getElementById("tonnage").value, 
-                                document.getElementById("streamlined").checked,
-                                document.getElementById("jump").value, 
-                                document.getElementById("maneuver").value, 
-                                document.getElementById("bridge").checked,
-                                document.getElementById("emplacements").value, 
-                                document.getElementById("cargo").value, 
-                                document.getElementById("accommodations").value );
-
-            document.getElementById("output").value = fnShipToString(ship);
+			clickSubmit();
 		</script>
     </body>
 <!-- 
@@ -617,3 +618,4 @@
     of the author who contributed it.
  -->
  </html>
+ 
