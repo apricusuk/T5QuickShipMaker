@@ -4,7 +4,7 @@ Traveller 5 Shipmaker client-side javascript in single html file
 (algorithm from X-Boat No 1 page 15-19 by Robert Eaglestone)
 
 ## Reference
-* [https://quickshipmaker.apricus.page/]
+* [https://quickshipmaker.apricus.page/](https://quickshipmaker.apricus.page/)
 * [https://witty-flower-07b53b703.azurestaticapps.net/](https://witty-flower-07b53b703.azurestaticapps.net/)
 * [Xboat on kickstarter.com](https://www.kickstarter.com/projects/762366408/xboat-zinequest)
 * [Xboat 1 on drivethrurpg.com](https://www.drivethrurpg.com/product/273367/Xboat-No-1)
